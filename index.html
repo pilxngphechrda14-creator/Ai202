@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="theme-color" content="#030712" />
+  <title>นักสืบไซเบอร์ ป.5 | AR Cyber Sleuth</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome v6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --cyan:#22d3ee; --blue:#3b82f6; --violet:#8b5cf6; --green:#34d399; --red:#fb7185; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; font-family:'Kanit',sans-serif; background:#030712; color:#f8fafc; }
+    body { touch-action:none; overscroll-behavior:none; }
+    button,input { font-family:inherit; }
+    button { user-select:none; }
+    #camera-bg {
+      position:fixed; inset:0; width:100%; height:100%; object-fit:cover;
+      transform:scaleX(-1); filter:brightness(.28) saturate(1.25) contrast(1.08);
+      z-index:0; background:#020617;
+    }
+    #camera-shade {
+      position:fixed; inset:0; z-index:1;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(34,211,238,.12), transparent 32%),
+        linear-gradient(135deg, rgba(2,6,23,.88), rgba(3,7,18,.55) 45%, rgba(15,23,42,.9));
+      pointer-events:none;
+    }
+    #scanlines { position:fixed; inset:0; z-index:2; pointer-events:none; opacity:.14;
+      background:repeating-linear-gradient(to bottom,transparent 0,transparent 3px,rgba(34,211,238,.08) 4px);
+    }
+    .app { position:relative; z-index:5; width:100%; height:100%; }
+    .glass {
+      background:rgba(15,23,42,.58);
+      border:1px solid rgba(148,163,184,.22);
+      box-shadow:0 12px 45px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.04);
+      backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    }
+    .glass-strong { background:rgba(2,6,23,.74); border:1px solid rgba(34,211,238,.22); backdrop-filter:blur(22px); }
+    .neon { text-shadow:0 0 12px rgba(34,211,238,.72),0 0 28px rgba(59,130,246,.35); }
+    .title-grad { background:linear-gradient(90deg,#67e8f9,#60a5fa,#a78bfa); -webkit-background-clip:text; background-clip:text;color:transparent; }
+    .btn-cyber {
+      position:relative; overflow:hidden; transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+      background:linear-gradient(135deg,#06b6d4,#2563eb);
+      box-shadow:0 0 18px rgba(34,211,238,.25);
+    }
+    .btn-cyber:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 28px rgba(34,211,238,.42); }
+    .btn-cyber:active:not(:disabled) { transform:scale(.97); }
+    .btn-cyber:disabled { opacity:.35; cursor:not-allowed; filter:grayscale(.5); }
+    .option {
+      transition:transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+      cursor:pointer;
+    }
+    .option:hover { transform:translateY(-2px); border-color:rgba(34,211,238,.65); box-shadow:0 0 20px rgba(34,211,238,.12); }
+    .option.selected { border-color:#22d3ee; background:rgba(8,145,178,.22); box-shadow:0 0 22px rgba(34,211,238,.18); }
+    .option.correct { border-color:#34d399 !important; background:rgba(16,185,129,.24) !important; box-shadow:0 0 26px rgba(52,211,153,.22); }
+    .option.wrong { border-color:#fb7185 !important; background:rgba(244,63,94,.22) !important; }
+    .camera-ring { box-shadow:0 0 0 2px rgba(34,211,238,.8),0 0 28px rgba(34,211,238,.3),inset 0 0 28px rgba(59,130,246,.2); }
+    .avatar { object-fit:cover; transform:scaleX(-1); }
+    .cursor-hand {
+      position:fixed; width:30px; height:30px; border-radius:999px; z-index:50;
+      border:3px solid #67e8f9; background:rgba(34,211,238,.12);
+      box-shadow:0 0 10px #22d3ee,0 0 28px rgba(59,130,246,.8);
+      transform:translate(-50%,-50%); pointer-events:none; display:none;
+    }
+    .cursor-hand::after { content:""; position:absolute; inset:6px; border-radius:50%; background:#e0f2fe; box-shadow:0 0 10px white; }
+    .hud-line { height:6px; border-radius:999px; background:rgba(148,163,184,.13); overflow:hidden; }
+    .hud-line > div { height:100%; border-radius:999px; background:linear-gradient(90deg,#22d3ee,#3b82f6,#8b5cf6); transition:width .35s ease; }
+    .animate-pop-in { animation:pop .45s cubic-bezier(.2,.9,.2,1) both; }
+    .floating { animation:float 3.4s ease-in-out infinite; }
+    .pulse-soft { animation:pulseSoft 1.8s ease-in-out infinite; }
+    @keyframes pop { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:none} }
+    @keyframes float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)} }
+    @keyframes pulseSoft { 0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,.18)}50%{box-shadow:0 0 0 12px rgba(34,211,238,0)} }
+    .particle { position:fixed; width:7px; height:7px; border-radius:50%; pointer-events:none; z-index:80; animation:burst .8s ease-out forwards; }
+    @keyframes burst { to { transform:translate(var(--dx),var(--dy)) scale(0); opacity:0; } }
+    .flash-good { animation:flashGood .55s ease-out; }
+    @keyframes flashGood { 0%{box-shadow:0 0 0 0 rgba(52,211,153,0)} 35%{box-shadow:0 0 50px 8px rgba(52,211,153,.4)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
+    .screen { position:absolute; inset:0; overflow:auto; padding:16px; scrollbar-width:none; }
+    .screen::-webkit-scrollbar {display:none;}
+    .hidden-screen { display:none !important; }
+    .mini-grid { background-image:linear-gradient(rgba(34,211,238,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.05) 1px,transparent 1px); background-size:22px 22px; }
+    .status-dot { width:8px;height:8px;border-radius:50%;display:inline-block;background:#34d399;box-shadow:0 0 10px #34d399; }
+    .status-dot.off { background:#fb7185;box-shadow:0 0 10px #fb7185; }
+    @media (max-width:640px) {
+      .screen { padding:10px; }
+      .question-text { font-size:1.18rem; line-height:1.45; }
+      .option { padding:.75rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <video id="camera-bg" autoplay muted playsinline></video>
+  <div id="camera-shade"></div>
+  <div id="scanlines"></div>
+  <canvas id="capture-canvas" class="hidden"></canvas>
+  <div id="hand-cursor" class="cursor-hand"></div>
+
+  <main class="app">
+    <!-- WELCOME -->
+    <section id="screen-welcome" class="screen flex items-center justify-center">
+      <div class="w-full max-w-5xl grid lg:grid-cols-2 gap-5 items-center">
+        <div class="glass rounded-3xl p-6 md:p-8 animate-pop-in mini-grid">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-12 h-12 rounded-2xl bg-cyan-400/10 border border-cyan-300/30 flex items-center justify-center text-cyan-300 text-xl floating">
+              <i class="fa-solid fa-user-secret"></i>
+            </div>
+            <div>
+              <div class="text-xs tracking-[.25em] text-cyan-300 uppercase">AR Cyber Sleuth</div>
+              <div class="text-xs text-slate-400">วิทยาการคำนวณ ป.5/3</div>
+            </div>
+          </div>
+
+          <h1 class="text-4xl md:text-6xl font-bold leading-tight title-grad neon">นักสืบไซเบอร์<br>ป.5</h1>
+          <p class="mt-4 text-slate-300 leading-relaxed">
+            ภารกิจฝึกทักษะความปลอดภัยบนอินเทอร์เน็ต
+            ใช้ความรู้ของนักสืบไซเบอร์เพื่อเลือกคำตอบที่ปลอดภัยที่สุด
+          </p>
+
+          <div class="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
+            <div class="glass rounded-2xl p-3"><i class="fa-solid fa-shield-halved text-cyan-300 text-lg"></i><div class="mt-1">ความปลอดภัย</div></div>
+            <div class="glass rounded-2xl p-3"><i class="fa-solid fa-user-lock text-violet-300 text-lg"></i><div class="mt-1">ข้อมูลส่วนตัว</div></div>
+            <div class="glass rounded-2xl p-3"><i class="fa-solid fa-link-slash text-emerald-300 text-lg"></i><div class="mt-1">ภัยออนไลน์</div></div>
+          </div>
+        </div>
+
+        <div class="glass rounded-3xl p-5 md:p-7 animate-pop-in" style="animation-delay:.08s">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h2 class="font-semibold text-xl">เตรียมตัวเป็นนักสืบ</h2>
+              <p class="text-sm text-slate-400">ถ่ายภาพ + ตั้งชื่อ แล้วเริ่มภารกิจ</p>
+            </div>
+            <div class="text-xs text-slate-400"><span id="camera-status-dot" class="status-dot off"></span> กล้อง</div>
+          </div>
+
+          <div class="mx-auto w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden camera-ring bg-slate-950 relative">
+            <video id="welcome-video" autoplay muted playsinline class="w-full h-full object-cover" style="transform:scaleX(-1)"></video>
+            <img id="welcome-photo" class="hidden w-full h-full object-cover avatar" alt="ภาพผู้เล่น">
+            <div id="camera-placeholder" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/70 text-slate-400">
+              <i class="fa-solid fa-camera text-4xl mb-2"></i><span class="text-xs">กำลังเปิดกล้อง...</span>
+            </div>
+          </div>
+
+          <button id="take-photo" class="mt-5 w-full rounded-2xl py-3 font-medium border border-cyan-300/25 bg-cyan-400/10 hover:bg-cyan-400/20 transition">
+            <i class="fa-solid fa-camera mr-2 text-cyan-300"></i> ถ่ายภาพนักสืบ
+          </button>
+
+          <label class="block mt-4 text-sm text-slate-300">ชื่อนักสืบ
+            <div class="relative mt-1">
+              <i class="fa-solid fa-id-badge absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+              <input id="player-name" maxlength="20" autocomplete="off" placeholder="พิมพ์ชื่อของคุณ (ไม่เกิน 20 ตัวอักษร)"
+                class="w-full rounded-2xl bg-slate-950/60 border border-slate-700/70 focus:border-cyan-400 outline-none px-11 py-3 text-white placeholder:text-slate-600">
+            </div>
+          </label>
+
+          <div id="welcome-hint" class="text-xs text-amber-300/90 mt-3 min-h-5">
+            <i class="fa-solid fa-circle-info mr-1"></i> กรุณาถ่ายภาพและกรอกชื่อก่อนเริ่มเกม
+          </div>
+
+          <button id="start-game" disabled class="btn-cyber w-full rounded-2xl py-3.5 font-semibold mt-1">
+            <i class="fa-solid fa-play mr-2"></i> เริ่มภารกิจนักสืบ
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- GAME -->
+    <section id="screen-game" class="screen hidden-screen">
+      <div class="max-w-5xl mx-auto h-full flex flex-col gap-3">
+        <header class="glass rounded-2xl px-3 py-2 flex items-center gap-3">
+          <img id="hud-photo" class="avatar w-11 h-11 rounded-xl border border-cyan-300/30" alt="ผู้เล่น">
+          <div class="min-w-0 flex-1">
+            <div id="hud-name" class="font-semibold truncate">นักสืบ</div>
+            <div class="text-[11px] text-slate-400">AR Cyber Sleuth • ป.5/3</div>
+          </div>
+          <div class="text-center px-2">
+            <div class="text-[10px] text-slate-400">คะแนน</div>
+            <div id="hud-score" class="font-bold text-cyan-300 text-lg">0</div>
+          </div>
+          <div class="text-center px-2">
+            <div class="text-[10px] text-slate-400">ข้อ</div>
+            <div id="hud-progress" class="font-bold text-white text-lg">1/12</div>
+          </div>
+        </header>
+
+        <div class="hud-line"><div id="progress-bar" style="width:8.33%"></div></div>
+
+        <div id="question-card" class="glass-strong rounded-3xl p-4 md:p-7 flex-1 overflow-auto animate-pop-in">
+          <div class="flex items-center gap-2 text-xs text-cyan-300 mb-3">
+            <span class="px-2 py-1 rounded-full bg-cyan-400/10 border border-cyan-300/20"><i class="fa-solid fa-magnifying-glass mr-1"></i> ภารกิจสืบสวน</span>
+            <span id="question-category" class="text-slate-400">ความปลอดภัย</span>
+          </div>
+          <h2 id="question-text" class="question-text text-xl md:text-2xl font-semibold leading-relaxed"></h2>
+          <div id="question-media" class="hidden mt-4 rounded-2xl overflow-hidden border border-slate-700 bg-slate-950"></div>
+          <div id="options" class="grid md:grid-cols-2 gap-3 mt-5"></div>
+
+          <div class="mt-5 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+            <div id="feedback" class="text-sm min-h-6 text-slate-400"></div>
+            <button id="next-btn" disabled class="btn-cyber rounded-xl px-6 py-3 font-semibold">
+              ตรวจคำตอบ <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="text-center text-[11px] text-slate-500 pb-1">
+          <i class="fa-solid fa-hand-pointer mr-1"></i> ยกนิ้วชี้เพื่อควบคุม • หรือแตะตัวเลือกด้วยหน้าจอ
+        </div>
+      </div>
+    </section>
+
+    <!-- RESULT -->
+    <section id="screen-result" class="screen hidden-screen flex items-center justify-center">
+      <div class="w-full max-w-3xl glass rounded-3xl p-6 md:p-9 text-center animate-pop-in">
+        <div class="w-20 h-20 mx-auto rounded-full bg-cyan-400/10 border border-cyan-300/30 flex items-center justify-center text-cyan-300 text-4xl pulse-soft">
+          <i class="fa-solid fa-shield-heart"></i>
+        </div>
+        <p class="mt-4 text-sm text-cyan-300">ภารกิจเสร็จสิ้น</p>
+        <h2 class="text-3xl md:text-4xl font-bold title-grad">นักสืบไซเบอร์ทำงานสำเร็จ!</h2>
+        <div id="result-photo-wrap" class="mt-4">
+          <img id="result-photo" class="avatar w-24 h-24 rounded-full mx-auto border-2 border-cyan-300/50" alt="ผู้เล่น">
+        </div>
+        <div class="mt-4 text-slate-300"><span id="result-name"></span></div>
+        <div class="mt-4 text-6xl font-bold text-cyan-300 neon"><span id="result-score">0</span><span class="text-lg text-slate-400 ml-2">คะแนน</span></div>
+        <div id="result-message" class="mt-2 text-slate-300"></div>
+
+        <div class="mt-6 grid sm:grid-cols-2 gap-3">
+          <button id="restart-btn" class="btn-cyber rounded-2xl py-3 font-semibold"><i class="fa-solid fa-rotate-right mr-2"></i>เล่นอีกครั้ง</button>
+          <button id="leaderboard-btn" class="rounded-2xl py-3 font-semibold bg-white/5 border border-white/10 hover:bg-white/10 transition"><i class="fa-solid fa-ranking-star mr-2 text-yellow-300"></i>กระดานคะแนน</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADERBOARD MODAL -->
+    <div id="leaderboard-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-black/65">
+      <div class="glass-strong rounded-3xl w-full max-w-lg p-5 md:p-7 max-h-[85vh] overflow-auto animate-pop-in">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs text-cyan-300 tracking-widest">CYBER SLEUTH</div>
+            <h3 class="text-2xl font-bold">กระดานคะแนน</h3>
+          </div>
+          <button id="close-leaderboard" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="leaderboard-status" class="text-xs text-slate-400 mt-2">กำลังโหลด...</div>
+        <div id="leaderboard-list" class="mt-4 space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-5 z-[100] hidden">
+      <div class="glass rounded-2xl px-4 py-3 text-sm shadow-2xl"><i id="toast-icon" class="fa-solid fa-circle-info mr-2 text-cyan-300"></i><span id="toast-text"></span></div>
+    </div>
+  </main>
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <!-- Firebase SDK 11.6.1 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // =========================================================
+    // FIREBASE CONFIG
+    // 1) สร้าง Web App ใน Firebase Console
+    // 2) เปิด Anonymous Authentication และ Firestore
+    // 3) นำ firebaseConfig ของคุณมาใส่ด้านล่าง
+    // หากปล่อยค่า placeholder ไว้ เกมยังเล่นได้ แต่ leaderboard จะใช้ Local Demo Mode
+    // =========================================================
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    let db = null, auth = null, firebaseUser = null;
+    const firebaseReady = !Object.values(firebaseConfig).some(v => String(v).includes("YOUR_"));
+
+    if (firebaseReady) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        onAuthStateChanged(auth, u => firebaseUser = u);
+        signInAnonymously(auth).catch(e => console.warn("Anonymous auth:", e));
+      } catch (e) {
+        console.warn("Firebase init failed:", e);
+      }
+    }
+
+    // expose safe functions to the main script
+    window.cyberFirebase = {
+      ready: () => !!db,
+      saveScore: async (entry) => {
+        if (!db) return false;
+        try {
+          await addDoc(collection(db, "cyber_sleuth_scores"), {
+            name: entry.name,
+            score: entry.score,
+            total: entry.total,
+            createdAt: serverTimestamp()
+          });
+          return true;
+        } catch (e) {
+          console.warn("Save score failed:", e);
+          return false;
+        }
+      },
+      getScores: async () => {
+        if (!db) return [];
+        try {
+          const q = query(collection(db, "cyber_sleuth_scores"), orderBy("score", "desc"), limit(20));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => d.data());
+        } catch (e) {
+          console.warn("Get scores failed:", e);
+          return [];
+        }
+      }
+    };
+  </script>
+
+  <script>
+    // ===========================
+    // AR CYBER SLEUTH APPLICATION
+    // ===========================
+    const QUESTIONS = [
+      {
+        category:"รหัสผ่าน", q:"เพื่อนส่งข้อความมาถามว่า “ขอรหัสผ่านเกมหน่อย จะช่วยเล่นให้” นักสืบควรทำอย่างไร?",
+        options:["บอกรหัสผ่านให้ เพราะเป็นเพื่อน","ส่งรหัสผ่านให้ทางแชตส่วนตัว","เก็บรหัสผ่านไว้เป็นความลับและไม่บอกใคร","โพสต์รหัสผ่านในกลุ่มเพื่อน"], answer:2,
+        explain:"รหัสผ่านเป็นข้อมูลสำคัญ ไม่ควรบอกให้ผู้อื่น แม้จะเป็นคนรู้จัก"
+      },
+      {
+        category:"ข้อมูลส่วนตัว", q:"ข้อใดเป็นข้อมูลส่วนตัวที่ไม่ควรโพสต์ให้คนทั่วไปเห็น?",
+        options:["สีที่ชอบ","ชื่อเกมที่ชอบ","ที่อยู่บ้านและเบอร์โทรศัพท์","วิชาที่ชอบ"], answer:2,
+        explain:"ที่อยู่และเบอร์โทรศัพท์สามารถนำไปใช้ระบุตัวบุคคลหรือสถานที่ได้"
+      },
+      {
+        category:"ลิงก์น่าสงสัย", q:"มีข้อความว่า “คุณได้รับรางวัล! คลิกลิงก์นี้เพื่อรับเงินทันที” ควรทำอย่างไร?",
+        options:["รีบคลิกทันที","ส่งต่อให้เพื่อนทุกคน","ตรวจสอบแหล่งที่มาและไม่คลิกลิงก์ที่น่าสงสัย","กรอกข้อมูลส่วนตัวเพื่อรับรางวัล"], answer:2,
+        explain:"ข้อความที่เร่งให้คลิกและขอข้อมูลอาจเป็นกลลวง ควรตรวจสอบก่อน"
+      },
+      {
+        category:"มารยาทออนไลน์", q:"ถ้าเห็นเพื่อนถูกล้อเลียนในกลุ่มแชต นักสืบควรทำอย่างไร?",
+        options:["ร่วมล้อด้วย","แคปภาพไปโพสต์ต่อ","หยุดการส่งต่อและแจ้งครูหรือผู้ใหญ่ที่ไว้ใจได้","กดหัวเราะเพื่อให้เพื่อนสนุก"], answer:2,
+        explain:"การไม่ส่งต่อและขอความช่วยเหลือจากผู้ใหญ่ช่วยลดการกลั่นแกล้งออนไลน์"
+      },
+      {
+        category:"ข่าวปลอม", q:"ก่อนแชร์ข่าวจากอินเทอร์เน็ต ควรทำสิ่งใดก่อน?",
+        options:["ดูว่ามีคนแชร์เยอะหรือไม่","ตรวจสอบแหล่งข่าวและข้อมูลจากหลายแหล่ง","แชร์ก่อนแล้วค่อยตรวจ","เชื่อทันทีถ้าพาดหัวน่าตกใจ"], answer:1,
+        explain:"จำนวนการแชร์ไม่ได้ยืนยันความจริง ควรตรวจสอบแหล่งข้อมูลและหลักฐาน"
+      },
+      {
+        category:"ความเป็นส่วนตัว", q:"แอปหนึ่งขอสิทธิ์เข้าถึงกล้อง ไมโครโฟน และตำแหน่ง ทั้งที่เป็นแอปจดโน้ต ควรทำอย่างไร?",
+        options:["อนุญาตทั้งหมดทันที","อ่านสิทธิ์ที่ขอและอนุญาตเท่าที่จำเป็น","ลบแอปทั้งหมดในเครื่อง","ให้เพื่อนตัดสินใจแทน"], answer:1,
+        explain:"ควรตรวจสอบว่าแอปจำเป็นต้องใช้สิทธิ์นั้นจริงหรือไม่"
+      },
+      {
+        category:"การหลอกลวง", q:"มีคนออนไลน์บอกว่าเป็นเจ้าหน้าที่และขอรหัส OTP ของผู้ปกครอง ควรทำอย่างไร?",
+        options:["บอก OTP เพื่อยืนยันตัวตน","ถามชื่อก่อนแล้วบอก OTP","ไม่บอก OTP และแจ้งผู้ปกครอง","ส่งภาพหน้าจอ OTP ให้"], answer:2,
+        explain:"OTP เป็นรหัสยืนยันที่สำคัญ ไม่ควรเปิดเผยให้ผู้อื่น"
+      },
+      {
+        category:"การดาวน์โหลด", q:"เว็บไซต์หนึ่งให้ดาวน์โหลดเกมฟรีพร้อมปุ่มโฆษณาหลายปุ่ม ควรทำอย่างไร?",
+        options:["กดทุกปุ่มเพื่อหาเกม","ดาวน์โหลดทันที","ตรวจสอบเว็บไซต์และใช้แหล่งดาวน์โหลดที่น่าเชื่อถือ","ปิดระบบป้องกันไวรัสก่อนดาวน์โหลด"], answer:2,
+        explain:"แหล่งดาวน์โหลดที่น่าเชื่อถือช่วยลดความเสี่ยงจากไฟล์อันตราย"
+      },
+      {
+        category:"การใช้ Wi‑Fi", q:"เมื่อใช้ Wi‑Fi สาธารณะ นักสืบควรระวังเรื่องใด?",
+        options:["ทุกเครือข่ายปลอดภัยเสมอ","เปิดเผยรหัสผ่านสำคัญให้เพื่อน","หลีกเลี่ยงการทำธุรกรรมสำคัญบนเครือข่ายที่ไม่น่าเชื่อถือ","ปิดการล็อกหน้าจอ"], answer:2,
+        explain:"เครือข่ายสาธารณะอาจมีความเสี่ยง จึงควรหลีกเลี่ยงกิจกรรมที่มีข้อมูลสำคัญ"
+      },
+      {
+        category:"ร่องรอยดิจิทัล", q:"การโพสต์รูปหรือข้อความบนอินเทอร์เน็ตควรคิดถึงเรื่องใด?",
+        options:["โพสต์แล้วลบได้เสมอจึงไม่ต้องคิด","ใครก็เห็นได้และอาจถูกบันทึกหรือส่งต่อ","โพสต์อะไรก็ได้ถ้าเป็นบัญชีส่วนตัว","ไม่จำเป็นต้องตรวจข้อมูลก่อนโพสต์"], answer:1,
+        explain:"ข้อมูลออนไลน์อาจถูกบันทึกหรือเผยแพร่ต่อ จึงควรคิดก่อนโพสต์"
+      },
+      {
+        category:"ความปลอดภัยของบัญชี", q:"ข้อใดช่วยเพิ่มความปลอดภัยของบัญชีออนไลน์?",
+        options:["ใช้รหัสผ่านเดียวกันทุกเว็บ","เปิดการยืนยันตัวตนสองขั้นตอนเมื่อมีให้ใช้","บอกรหัสผ่านให้เพื่อนสนิท","เขียนรหัสผ่านไว้ใต้คีย์บอร์ด"], answer:1,
+        explain:"การยืนยันตัวตนสองขั้นตอนเพิ่มชั้นการป้องกันให้บัญชี"
+      },
+      {
+        category:"ขอความช่วยเหลือ", q:"ถ้านักเรียนพบสิ่งที่น่ากลัวหรือไม่เหมาะสมบนอินเทอร์เน็ต ควรทำอย่างไร?",
+        options:["เก็บไว้คนเดียว","ส่งต่อให้เพื่อนดู","ปิดหรือออกจากหน้าและบอกผู้ใหญ่ที่ไว้ใจได้","ตอบโต้คนที่ส่งมา"], answer:2,
+        explain:"การบอกผู้ใหญ่ที่ไว้ใจได้ช่วยให้ได้รับคำแนะนำและความช่วยเหลืออย่างเหมาะสม"
+      }
+    ];
+
+    const $ = id => document.getElementById(id);
+    const screens = { welcome:$("screen-welcome"), game:$("screen-game"), result:$("screen-result") };
+    let stream = null, capturedPhoto = null, playerName = "", score = 0, questionIndex = 0;
+    let selected = null, answered = false, handReady = false, handCamera = null;
+    let localScores = JSON.parse(localStorage.getItem("cyberSleuthScores") || "[]");
+
+    function showScreen(name) {
+      Object.values(screens).forEach(s => s.classList.add("hidden-screen"));
+      screens[name].classList.remove("hidden-screen");
+    }
+
+    function toast(msg, type="info") {
+      $("toast-text").textContent = msg;
+      $("toast-icon").className = "fa-solid " + (type==="good" ? "fa-circle-check text-emerald-300" : type==="bad" ? "fa-circle-xmark text-rose-300" : "fa-circle-info text-cyan-300") + " mr-2";
+      $("toast").classList.remove("hidden");
+      clearTimeout(window.__toast);
+      window.__toast = setTimeout(() => $("toast").classList.add("hidden"), 2300);
+    }
+
+    function updateStartState() {
+      const ok = !!capturedPhoto && $("player-name").value.trim().length > 0;
+      $("start-game").disabled = !ok;
+      $("welcome-hint").innerHTML = ok
+        ? '<i class="fa-solid fa-circle-check mr-1 text-emerald-300"></i> พร้อมเริ่มภารกิจแล้ว!'
+        : '<i class="fa-solid fa-circle-info mr-1"></i> กรุณาถ่ายภาพและกรอกชื่อก่อนเริ่มเกม';
+    }
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user", width:{ideal:1280}, height:{ideal:720}}, audio:false});
+        $("camera-bg").srcObject = stream;
+        $("welcome-video").srcObject = stream;
+        $("camera-placeholder").classList.add("hidden");
+        $("camera-status-dot").classList.remove("off");
+      } catch (e) {
+        $("camera-placeholder").innerHTML = '<i class="fa-solid fa-video-slash text-4xl mb-2 text-rose-300"></i><span class="text-xs">ไม่สามารถเปิดกล้องได้</span>';
+        toast("ไม่สามารถเข้าถึงกล้องได้ — ตรวจสอบสิทธิ์กล้องของเบราว์เซอร์", "bad");
+      }
+    }
+
+    function takePhoto() {
+      if (!stream) { toast("ยังไม่พบกล้อง", "bad"); return; }
+      const video = $("welcome-video"), canvas = $("capture-canvas");
+      canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      ctx.translate(canvas.width,0); ctx.scale(-1,1);
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      capturedPhoto = canvas.toDataURL("image/jpeg", .82);
+      $("welcome-photo").src = capturedPhoto;
+      $("welcome-photo").classList.remove("hidden");
+      $("welcome-video").classList.add("hidden");
+      $("take-photo").innerHTML = '<i class="fa-solid fa-camera-rotate mr-2 text-cyan-300"></i> ถ่ายใหม่';
+      updateStartState();
+      toast("ถ่ายภาพเรียบร้อย!", "good");
+    }
+
+    function startGame() {
+      playerName = $("player-name").value.trim().slice(0,20);
+      score = 0; questionIndex = 0; selected = null; answered = false;
+      $("hud-name").textContent = playerName;
+      $("hud-photo").src = capturedPhoto;
+      showScreen("game");
+      renderQuestion();
+      startHandTracking();
+    }
+
+    function renderQuestion() {
+      const q = QUESTIONS[questionIndex];
+      $("hud-score").textContent = score;
+      $("hud-progress").textContent = `${questionIndex+1}/${QUESTIONS.length}`;
+      $("progress-bar").style.width = `${((questionIndex+1)/QUESTIONS.length)*100}%`;
+      $("question-category").textContent = q.category;
+      $("question-text").textContent = q.q;
+      $("feedback").textContent = "";
+      $("feedback").className = "text-sm min-h-6 text-slate-400";
+      $("next-btn").disabled = true;
+      $("next-btn").innerHTML = 'ตรวจคำตอบ <i class="fa-solid fa-arrow-right ml-1"></i>';
+      selected = null; answered = false;
+
+      const media = $("question-media");
+      media.classList.add("hidden"); media.innerHTML = "";
+
+      const options = $("options");
+      options.innerHTML = "";
+      q.options.forEach((opt,i) => {
+        const b = document.createElement("button");
+        b.className = "option glass rounded-2xl p-4 text-left border border-slate-700/70 flex items-start gap-3";
+        b.dataset.index = i;
+        b.innerHTML = `<span class="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-cyan-300 font-semibold">${String.fromCharCode(65+i)}</span><span>${opt}</span>`;
+        b.addEventListener("click", () => selectOption(i));
+        options.appendChild(b);
+      });
+      $("question-card").classList.remove("animate-pop-in");
+      void $("question-card").offsetWidth;
+      $("question-card").classList.add("animate-pop-in");
+    }
+
+    function selectOption(i) {
+      if (answered) return;
+      selected = i;
+      [...$("options").children].forEach((el,j) => el.classList.toggle("selected", j===i));
+      $("next-btn").disabled = false;
+      $("feedback").textContent = "เลือกคำตอบแล้ว — กด “ตรวจคำตอบ”";
+    }
+
+    function submitAnswer() {
+      if (selected === null || answered) return;
+      answered = true;
+      const q = QUESTIONS[questionIndex];
+      const correct = selected === q.answer;
+      [...$("options").children].forEach((el,j) => {
+        el.classList.remove("selected");
+        if (j === q.answer) el.classList.add("correct");
+        if (j === selected && selected !== q.answer) el.classList.add("wrong");
+      });
+      if (correct) {
+        score += 10;
+        $("hud-score").textContent = score;
+        $("feedback").innerHTML = `<span class="text-emerald-300"><i class="fa-solid fa-check mr-1"></i>ถูกต้อง! +10 คะแนน</span> <span class="text-slate-400">${q.explain}</span>`;
+        $("question-card").classList.add("flash-good");
+        burstParticles();
+      } else {
+        $("feedback").innerHTML = `<span class="text-rose-300"><i class="fa-solid fa-xmark mr-1"></i>ยังไม่ถูก</span> <span class="text-slate-400">${q.explain}</span>`;
+      }
+      $("next-btn").disabled = false;
+      $("next-btn").innerHTML = questionIndex === QUESTIONS.length-1
+        ? 'ดูผลภารกิจ <i class="fa-solid fa-flag-checkered ml-1"></i>'
+        : 'ข้อถัดไป <i class="fa-solid fa-arrow-right ml-1"></i>';
+    }
+
+    function nextQuestion() {
+      if (!answered) return submitAnswer();
+      if (questionIndex < QUESTIONS.length - 1) {
+        questionIndex++;
+        renderQuestion();
+      } else {
+        finishGame();
+      }
+    }
+
+    async function finishGame() {
+      stopHandTracking();
+      $("result-photo").src = capturedPhoto;
+      $("result-name").textContent = playerName;
+      $("result-score").textContent = score;
+      const pct = Math.round(score / (QUESTIONS.length*10) * 100);
+      $("result-message").textContent = pct >= 80 ? "ยอดเยี่ยม! คุณรู้จักป้องกันตัวในโลกออนไลน์ได้ดี" :
+        pct >= 60 ? "ทำได้ดี! ลองทบทวนบางภารกิจแล้วกลับมาเล่นใหม่ได้" :
+        "ภารกิจครั้งนี้เป็นโอกาสฝึกฝน ลองทบทวนเรื่องความปลอดภัยแล้วเล่นอีกครั้ง";
+      showScreen("result");
+
+      const entry = {name:playerName, score, total:QUESTIONS.length*10, at:Date.now()};
+      localScores.push(entry);
+      localScores.sort((a,b)=>b.score-a.score || a.at-b.at);
+      localScores = localScores.slice(0,20);
+      localStorage.setItem("cyberSleuthScores", JSON.stringify(localScores));
+      if (window.cyberFirebase) {
+        const ok = await window.cyberFirebase.saveScore(entry);
+        if (ok) toast("บันทึกคะแนนออนไลน์แล้ว", "good");
+      }
+    }
+
+    function burstParticles() {
+      const cx = window.innerWidth/2, cy = window.innerHeight/2;
+      for(let i=0;i<30;i++){
+        const p=document.createElement("div");
+        p.className="particle";
+        p.style.left=cx+"px"; p.style.top=cy+"px";
+        p.style.setProperty("--dx", `${(Math.random()-.5)*360}px`);
+        p.style.setProperty("--dy", `${(Math.random()-.5)*280}px`);
+        p.style.background = ["#22d3ee","#60a5fa","#a78bfa","#34d399","#facc15"][i%5];
+        document.body.appendChild(p);
+        setTimeout(()=>p.remove(),850);
+      }
+    }
+
+    // ---------------- Hand Tracking ----------------
+    async function startHandTracking() {
+      if (handReady || !window.Hands || !window.Camera) return;
+      try {
+        const hands = new Hands({locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({
+          maxNumHands:1, modelComplexity:1,
+          minDetectionConfidence:.55, minTrackingConfidence:.55
+        });
+        hands.onResults(results => {
+          const lm = results.multiHandLandmarks && results.multiHandLandmarks[0];
+          if (!lm) { $("hand-cursor").style.display="none"; return; }
+          const tip = lm[8];
+          const x = (1-tip.x) * window.innerWidth;
+          const y = tip.y * window.innerHeight;
+          $("hand-cursor").style.left=x+"px";
+          $("hand-cursor").style.top=y+"px";
+          $("hand-cursor").style.display="block";
+          handReady = true;
+          // Finger-as-cursor: trigger click only after holding over an option briefly.
+          handHover(x,y);
+        });
+
+        handCamera = new Camera($("camera-bg"), {
+          onFrame: async () => { await hands.send({image:$("camera-bg")}); },
+          width:640, height:480
+        });
+        handCamera.start();
+      } catch(e) { console.warn("Hands setup failed:",e); }
+    }
+
+    let hoverEl = null, hoverSince = 0, hoverTriggered = false;
+    function handHover(x,y) {
+      if (answered || screens.game.classList.contains("hidden-screen")) return;
+      const el = document.elementFromPoint(x,y);
+      const option = el && el.closest(".option");
+      if (option !== hoverEl) { hoverEl=option; hoverSince=Date.now(); hoverTriggered=false; }
+      if (option && !hoverTriggered && Date.now()-hoverSince > 850) {
+        hoverTriggered=true;
+        selectOption(Number(option.dataset.index));
+        option.animate([{transform:"scale(1)"},{transform:"scale(1.035)"},{transform:"scale(1)"}],{duration:240});
+      }
+    }
+
+    function stopHandTracking() {
+      $("hand-cursor").style.display="none";
+      try { handCamera && handCamera.stop(); } catch(e){}
+      handCamera=null; handReady=false;
+    }
+
+    async function openLeaderboard() {
+      $("leaderboard-modal").classList.remove("hidden");
+      $("leaderboard-modal").classList.add("flex");
+      $("leaderboard-status").textContent = window.cyberFirebase && window.cyberFirebase.ready()
+        ? "คะแนนออนไลน์จาก Firebase"
+        : "Demo Mode: คะแนนในเครื่องนี้";
+      let rows = [];
+      if (window.cyberFirebase && window.cyberFirebase.ready()) rows = await window.cyberFirebase.getScores();
+      if (!rows.length) rows = localScores;
+      renderLeaderboard(rows);
+    }
+
+    function renderLeaderboard(rows) {
+      const list = $("leaderboard-list"); list.innerHTML="";
+      if (!rows.length) {
+        list.innerHTML='<div class="text-center text-slate-500 py-8">ยังไม่มีคะแนน</div>'; return;
+      }
+      rows.slice(0,20).forEach((r,i)=>{
+        const div=document.createElement("div");
+        div.className="glass rounded-2xl p-3 flex items-center gap-3";
+        div.innerHTML=`<div class="w-9 h-9 rounded-xl flex items-center justify-center ${i<3?'bg-yellow-400/10 text-yellow-300':'bg-white/5 text-slate-400'} font-bold">${i+1}</div>
+          <div class="flex-1 min-w-0"><div class="font-medium truncate">${escapeHTML(r.name||"นักสืบ")}</div><div class="text-[10px] text-slate-500">${r.total||120} คะแนนเต็ม</div></div>
+          <div class="font-bold text-cyan-300">${Number(r.score)||0}</div>`;
+        list.appendChild(div);
+      });
+    }
+
+    function escapeHTML(s) {
+      return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+    }
+
+    function restart() {
+      capturedPhoto = null;
+      $("welcome-photo").classList.add("hidden");
+      $("welcome-video").classList.remove("hidden");
+      $("take-photo").innerHTML='<i class="fa-solid fa-camera mr-2 text-cyan-300"></i> ถ่ายภาพนักสืบ';
+      $("player-name").value="";
+      updateStartState();
+      showScreen("welcome");
+      startCamera();
+    }
+
+    // Prevent accidental page gestures
+    ["touchstart","touchmove","touchend","gesturestart","gesturechange","gestureend"].forEach(evt=>{
+      document.addEventListener(evt,e=>e.preventDefault(),{passive:false});
+    });
+    document.addEventListener("contextmenu", e=>e.preventDefault());
+
+    $("take-photo").addEventListener("click", takePhoto);
+    $("player-name").addEventListener("input", updateStartState);
+    $("start-game").addEventListener("click", startGame);
+    $("next-btn").addEventListener("click", nextQuestion);
+    $("restart-btn").addEventListener("click", restart);
+    $("leaderboard-btn").addEventListener("click", openLeaderboard);
+    $("close-leaderboard").addEventListener("click",()=>{$("leaderboard-modal").classList.add("hidden");$("leaderboard-modal").classList.remove("flex");});
+    $("leaderboard-modal").addEventListener("click",e=>{if(e.target===$("leaderboard-modal")){$("leaderboard-modal").classList.add("hidden");$("leaderboard-modal").classList.remove("flex");}});
+
+    // Keyboard fallback for desktop
+    document.addEventListener("keydown", e => {
+      if (screens.game.classList.contains("hidden-screen")) return;
+      if (/^[1-4]$/.test(e.key)) selectOption(Number(e.key)-1);
+      if (e.key==="Enter") nextQuestion();
+    });
+
+    startCamera();
+    updateStartState();
+  </script>
+</body>
+</html>
